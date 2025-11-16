@@ -45,9 +45,9 @@ public class PillReminderService {
 
                     try {
                         mailSender.send(msg);
-                        System.out.println("📨 Đã gửi thông báo hỏi tiếp tục uống thuốc đến: " + email);
+                        System.out.println(" Đã gửi thông báo hỏi tiếp tục uống thuốc đến: " + email);
                     } catch (Exception e) {
-                        System.out.println("❌ Gửi thông báo thất bại: " + e.getMessage());
+                        System.out.println(" Gửi thông báo thất bại: " + e.getMessage());
                     }
                 }
             }

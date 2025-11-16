@@ -29,12 +29,7 @@ public class StisBookingService {
     private final StisBookingRepository stisBookingRepository;
     private final UserRepository userRepository;
     private final StisServiceRepository stisServiceRepository;
-    //
-    // public List<StisBookingResponse> getAllBookings() {
-    //
-    // return
-    // stisBookingRepository.findAll().stream().map(this::mapToResponse).toList();
-    // }
+
     public StisBooking getBookingByID(Integer id) {
         return stisBookingRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
@@ -66,8 +61,8 @@ public class StisBookingService {
 
     public StisBookingResponse createBooking(StisBookingRequest booking) {
         StisBooking stisBooking = new StisBooking();
-        if (this.stisBookingRepository.countByUserIdAndBookingDate(booking.getCustomerId(),
-                booking.getBookingDate().atStartOfDay(), booking.getBookingDate().atTime(LocalTime.MAX)) > 0) {
+        if (this.stisBookingRepository.countByUserIdAndBookingDateAndStatus(booking.getCustomerId(),
+                booking.getBookingDate().atStartOfDay(), booking.getBookingDate().atTime(LocalTime.MAX),StisBookingStatus.CONFIRMED) > 0) {
             throw new RuntimeException("Bạn đã có lịch hẹn trong ngày này. Vui lòng chọn ngày khác.");
         }
         if (this.isBookingLimitExceeded(booking.getServiceId(),
@@ -82,9 +77,18 @@ public class StisBookingService {
         if (booking.getBookingTime().isBefore(LocalTime.now()) && booking.getBookingDate().isEqual(LocalDate.now())) {
             throw new RuntimeException("Không thể đặt lịch trong quá khứ. Vui lòng chọn thời gian hợp lệ.");
         }
+        if (this.userRepository.findById(booking.getCustomerId()).isPresent()) {
+            stisBooking.setCustomer(this.userRepository.findById(booking.getCustomerId()).get());
+        } else {
+            throw new RuntimeException("Người dùng không tồn tại."+ booking.getCustomerId());
+        }
+        if (this.stisServiceRepository.findById(booking.getServiceId()).isPresent()) {
+            stisBooking.setStisService(this.stisServiceRepository.findById(booking.getServiceId()).get());
 
-        stisBooking.setCustomer(this.userRepository.findById(booking.getCustomerId()).get());
-        stisBooking.setStisService(this.stisServiceRepository.findById(booking.getServiceId()).get());
+        }
+        else {
+            throw new RuntimeException("Dịch vụ không tồn tại.");
+        }
         LocalDateTime bookingDate = LocalDateTime.of(booking.getBookingDate(), booking.getBookingTime());
         stisBooking.setBookingDate(bookingDate);
         stisBooking.setStatus(StisBookingStatus.CONFIRMED);
@@ -177,12 +181,6 @@ public class StisBookingService {
         }
     }
 
-    // public List<StisBookingResponse> getBookingHistoryByCustomer(Integer
-    // customerId) {
-    // // Fetch booking history for a specific customer from the repository
-    // return
-    // stisBookingRepository.findByCustomer_UserId(customerId).stream().map(this::mapToResponse).toList();
-    // }
     public Page<StisBookingResponse> GetHistory(int ID, Integer serviceID, StisBookingStatus status,
             LocalDateTime startDateTime, LocalDateTime endDateTime, int page, int size, String sort) {
         Pageable pageable;
@@ -208,7 +206,6 @@ public class StisBookingService {
     }
 
     public StisBookingResponse mapToResponse(StisBooking booking) {
-        // Map properties from StisBooking to StisBookingResponse
         StisBookingResponse response = new StisBookingResponse();
         response.setBookingId(booking.getBookingId());
         response.setCustomerId(booking.getCustomer().getUserId());
@@ -217,7 +214,6 @@ public class StisBookingService {
         response.setServiceName(booking.getStisService().getServiceName());
         response.setServicePrice(booking.getStisService().getPrice());
         response.setStisInvoiceID(booking.getStisInvoice() != null ? booking.getStisInvoice().getInvoiceId() : null);
-//        response.setResultStatus(booking.getStisResults().any);
         response.setBookingDate(booking.getBookingDate().toLocalDate());
         response.setBookingTimeStart(booking.getBookingDate().toLocalTime());
         response.setBookingTimeEnd(booking.getBookingDate().toLocalTime().plusHours(1));
@@ -232,17 +228,17 @@ public class StisBookingService {
         return response;
     }
 
-
     public void resultedTime(Integer id) {
         StisBooking booking = stisBookingRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Booking not found"));
         booking.setResultedAt(LocalDateTime.now());
         stisBookingRepository.save(booking);
     }
-    @Scheduled(fixedRate = 60000) // chạy mỗi phút
+
+    @Scheduled(fixedRate = 60000)
     @Transactional
     public void autoCancelUnpaidBookings() {
-        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(30); // Cắt đứt sau 30 phút
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(30);
 
         List<StisBooking> bookingsToCancel =
                 stisBookingRepository.findByPaymentStatusAndStatusAndCreatedAtBeforeAndPaymentMethodNot(
@@ -254,5 +250,50 @@ public class StisBookingService {
             stisBookingRepository.save(booking);
             System.out.println("Canceled booking id: " + booking.getBookingId());
         }
+    }
+
+    /**
+     * Reschedules an existing booking to a new date and time
+     * @param id The booking ID to reschedule
+     * @param newDate The new date for the booking
+     * @param newTime The new time for the booking
+     * @return The updated booking response
+     */
+    public StisBookingResponse rescheduleBooking(Integer id, LocalDate newDate, LocalTime newTime) {
+        StisBooking booking = stisBookingRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Booking not found with id: " + id));
+
+        // Validate new date and time
+        if (newDate.isBefore(LocalDate.now())) {
+            throw new RuntimeException("Không thể đặt lịch trong quá khứ. Vui lòng chọn ngày hợp lệ.");
+        }
+        if (newTime.isBefore(LocalTime.now()) && newDate.isEqual(LocalDate.now())) {
+            throw new RuntimeException("Không thể đặt lịch trong quá khứ. Vui lòng chọn thời gian hợp lệ.");
+        }
+
+        // Check if user already has booking on this date
+        if (this.stisBookingRepository.countByUserIdAndBookingDateAndStatus(
+                booking.getCustomer().getUserId(),
+                newDate.atStartOfDay(),
+                newDate.atTime(LocalTime.MAX),
+                StisBookingStatus.CONFIRMED) > 0 &&
+                !booking.getBookingDate().toLocalDate().equals(newDate)) {
+            throw new RuntimeException("Bạn đã có lịch hẹn trong ngày này. Vui lòng chọn ngày khác.");
+        }
+
+        // Check booking limit for the service at the new time
+        LocalDateTime newDateTime = LocalDateTime.of(newDate, newTime);
+        if (this.isBookingLimitExceeded(booking.getStisService().getServiceId(), newDateTime)) {
+            throw new RuntimeException(
+                    "Số lượng đặt lịch đã vượt quá giới hạn cho dịch vụ này trong khoảng thời gian đã chọn.");
+        }
+
+        // Update booking with new date and time
+        booking.setBookingDate(newDateTime);
+        booking.setUpdatedAt(LocalDateTime.now());
+
+        // Save and return the updated booking
+        StisBooking updatedBooking = stisBookingRepository.save(booking);
+        return mapToResponse(updatedBooking);
     }
 }

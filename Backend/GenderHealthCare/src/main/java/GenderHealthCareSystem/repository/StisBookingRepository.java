@@ -45,13 +45,14 @@ public interface StisBookingRepository extends JpaRepository<StisBooking, Intege
                                  @Param("status") StisBookingStatus status,
                                  Pageable pageable);
 
-    @Query("SELECT COUNT(sb) FROM StisBooking sb " +
-            "WHERE sb.customer.userId = :userId " +
-            "AND sb.bookingDate BETWEEN :startOfDay AND :endOfDay")
-    long countByUserIdAndBookingDate(
+    @Query("SELECT COUNT(b) FROM StisBooking b WHERE b.customer.userId = :userId " +
+            "AND b.bookingDate BETWEEN :startDateTime AND :endDateTime " +
+            "AND b.status = :status")
+    long countByUserIdAndBookingDateAndStatus(
             @Param("userId") Integer userId,
-            @Param("startOfDay") LocalDateTime startOfDay,
-            @Param("endOfDay") LocalDateTime endOfDay);
+            @Param("startDateTime") LocalDateTime startDateTime,
+            @Param("endDateTime") LocalDateTime endDateTime,
+            @Param("status") StisBookingStatus status);
 
     @Query("SELECT COUNT(sb) FROM StisBooking sb " +
             "WHERE sb.stisService.serviceId = :serviceId " +

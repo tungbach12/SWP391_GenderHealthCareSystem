@@ -43,7 +43,6 @@ export default function PillScheduleCalendar() {
       let currentDate = startDate;
       let counted = 0;
 
-      // ✅ Tính đủ pillType ngày liên tiếp, không skip ngày
       while (counted < pillType) {
         const dateStr = currentDate.format('YYYY-MM-DD');
         const item = map[dateStr] || {
@@ -72,8 +71,6 @@ export default function PillScheduleCalendar() {
 
       if (autoMarkPromises.length > 0) {
         await Promise.all(autoMarkPromises);
-
-        // Reload sau auto-mark
         const updated = await getAllPillSchedules();
         updated?.data?.forEach(item => {
           const dateStr = dayjs(item.pillDate).format('YYYY-MM-DD');
@@ -221,6 +218,7 @@ export default function PillScheduleCalendar() {
   }
 
   const startDateStr = localStorage.getItem('pillStartDate');
+  const pillType = parseInt(localStorage.getItem('pillType') || '28', 10);
 
   return (
     <div className="max-w-4xl mx-auto mt-6 p-6 bg-white shadow-md rounded">
@@ -229,7 +227,7 @@ export default function PillScheduleCalendar() {
       </h2>
       {startDateStr && (
         <p className="text-center text-gray-600 text-sm mb-4">
-          📅 Ngày bắt đầu: <strong>{dayjs(startDateStr).format('DD/MM/YYYY')}</strong>
+          Ngày bắt đầu: <strong>{dayjs(startDateStr).format('DD/MM/YYYY')}</strong>
         </p>
       )}
 
@@ -251,21 +249,46 @@ export default function PillScheduleCalendar() {
             <p>Chưa uống: <strong>{notTakenCount}</strong> viên</p>
           </div>
 
-          {takenCount >= parseInt(localStorage.getItem('pillType') || '28', 10) && (
-            <div className="text-center p-4 bg-green-100 border border-green-300 rounded mt-4">
-              🎉 Bạn đã hoàn thành đợt uống thuốc này. Hãy bắt đầu đợt mới nếu cần!
-              <button
-                onClick={() => {
-                  localStorage.removeItem('pillStartDate');
-                  localStorage.removeItem('pillType');
-                  navigate('/pill/tracker');
-                }}
-                className="ml-4 bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
-              >
-                Nhập lịch mới
-              </button>
-            </div>
-          )}
+          {/* ✅ Đợi 7 ngày sau viên thứ 21 */}
+          {(() => {
+            const activePillCount = pillType === 28 ? 21 : pillType;
+            const datesTaken = Object.entries(updatedSchedule)
+              .filter(([_, item]) => item?.hasTaken === true)
+              .map(([dateStr]) => dayjs(dateStr))
+              .sort((a, b) => a - b);
+
+            if (datesTaken.length >= activePillCount) {
+              const lastTakenDate = datesTaken[activePillCount - 1];
+              const canStartNew = dayjs().isSameOrAfter(lastTakenDate.add(7, 'day'), 'day');
+
+              if (canStartNew) {
+                return (
+                  <div className="text-center p-4 bg-green-100 border border-green-300 rounded mt-4">
+                    🎉 Bạn đã hoàn thành đợt uống thuốc này. Hãy bắt đầu đợt mới nếu cần!
+                    <button
+                      onClick={() => {
+                        localStorage.removeItem('pillStartDate');
+                        localStorage.removeItem('pillType');
+                        navigate('/pill/tracker');
+                      }}
+                      className="ml-4 bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+                    >
+                      Nhập lịch mới
+                    </button>
+                  </div>
+                );
+              } else {
+                const waitUntil = lastTakenDate.add(7, 'day').format('DD/MM/YYYY');
+                return (
+                  <div className="text-center p-4 bg-yellow-100 border border-yellow-300 rounded mt-4">
+                    ⏳ Bạn cần đợi đến <strong>{waitUntil}</strong> để bắt đầu đợt uống thuốc mới.
+                  </div>
+                );
+              }
+            }
+
+            return null;
+          })()}
 
           <div className="mt-6 flex justify-center gap-4">
             <button

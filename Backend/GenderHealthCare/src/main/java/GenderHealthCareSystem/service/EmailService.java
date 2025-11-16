@@ -36,6 +36,8 @@ public class EmailService {
             logger.info("[DEBUG] Email successfully sent to: {}", to);
         } catch (Exception e) {
             logger.error("[ERROR] Failed to send email to: {}", to, e);
+            logger.error("[ERROR] Exception message: {}", e.getMessage());
+            logger.error("[ERROR] Cause: {}", e.getCause());
         }
     }
     public void sendBookingConfirmationEmail(String to, String serviceName,

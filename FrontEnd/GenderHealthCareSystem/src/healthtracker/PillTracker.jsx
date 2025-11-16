@@ -6,7 +6,7 @@ import { getAllPillSchedules, pillAPI } from '../components/api/Pill.api';
 export default function PillTracker() {
   const [pillStartDate, setPillStartDate] = useState('');
   const [pillType, setPillType] = useState('28');
-  const [notificationOption, setNotificationOption] = useState('DAILY'); // 🔁 new
+  const [notificationOption, setNotificationOption] = useState('DAILY'); 
   const [loading, setLoading] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [popupMessage, setPopupMessage] = useState('');
@@ -29,7 +29,7 @@ export default function PillTracker() {
 
       navigate('/pill/schedule');
     } catch (err) {
-      console.error('❌ Lỗi kiểm tra lịch:', err);
+      console.error('Lỗi kiểm tra lịch:', err);
     }
   };
 
@@ -62,7 +62,7 @@ export default function PillTracker() {
 
       navigate('/pill/schedule', { state: { schedule: scheduleArray } });
     } catch (err) {
-      console.error('❌ Lỗi tạo lịch:', err);
+      console.error('Lỗi tạo lịch:', err);
       setPopupMessage('Không thể khởi tạo lịch.');
       setShowPopup(true);
     } finally {

@@ -108,7 +108,7 @@ const STIBooking = () => {
     { value: "16:30", label: "16:30 - 17:30" , disabled: false },
   ];
 
-  // Disable các ngày trong quá khứ và cuối tuần
+  // Disable các ngày trong quá khứ
   const disabledDate = (current) => {
     // Không cho chọn ngày trong quá khứ và ngày hiện tại
     if (current && current < dayjs().endOf("day")) {
@@ -210,7 +210,7 @@ const STIBooking = () => {
 
       setTimeout(() => {
         window.location.href = response.data;
-      }, 1500);
+      }, 500);
     } catch (error) {
       console.error(error.response.data.message);
       message.error(

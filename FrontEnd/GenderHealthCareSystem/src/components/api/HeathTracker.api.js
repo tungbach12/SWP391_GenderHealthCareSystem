@@ -1,4 +1,3 @@
-// src/api/healthTracker.api.js
 import apiClient from "./apiClient";
 
 export const healthTrackerAPI = async (values) => {

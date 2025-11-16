@@ -1,4 +1,4 @@
-// src/api/blog.api.js
+
 import apiClient from "./apiClient";
 
 export const blogHomeAPI = async () => {
@@ -93,7 +93,7 @@ export const rejectBlogAPI = async (postId) => {
 }
 
 export const deleteBlogAPI = async (postId) => {
-  return apiClient.delete(`/blog-posts/${postId}`);
+  return apiClient.put(`/blog-posts/${postId}/delete`);
 };
 
 export const updateBlogAPI = async (postId, values) => {

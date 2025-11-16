@@ -162,7 +162,7 @@ export default function ConsultationBooking() {
         footer={null}
         width={600}
         centered
-        style={{ top: 20 }} // Điều chỉnh vị trí modal để tăng không gian hiển thị
+        style={{ top: 20 }} 
       >
         <div className="mt-4">
           <h3 className="text-lg font-medium mb-4">Đặt lịch tư vấn</h3>
@@ -175,7 +175,7 @@ export default function ConsultationBooking() {
               fullName: user?.fullName || "",
               phone: user?.phone || "",
               email: user?.email || "",
-              paymentMethod: ""  // Đổi giá trị mặc định từ "bank" thành "vnpay"
+              paymentMethod: ""  
             }}
           >
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

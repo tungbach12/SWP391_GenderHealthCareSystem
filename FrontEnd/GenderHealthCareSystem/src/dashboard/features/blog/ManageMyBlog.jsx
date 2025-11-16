@@ -81,8 +81,16 @@ const ManageMyBlog = () => {
       text: "Bị từ chối",
       color: "#f5222d",
       badgeColor: "red",
-      description: "Bài viết đã bị từ chối, vui lòng chỉnh sửa nội dung",
+      description: "Bài viết đã bị từ chối",
     },
+    DELETED: {
+      status: "deleted",
+      text: "Đã xóa",
+      color: "#f5222d",
+      badgeColor: "red",
+      description: "Bài viết đã bị xóa và không còn hiển thị",
+    },
+
   };
 
   // Danh sách status options để lọc

@@ -1,4 +1,3 @@
-// ✅ File: src/pages/MenstrualTracker.jsx
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -18,7 +17,6 @@ export default function MenstrualTracker() {
   const location = useLocation();
 
   useEffect(() => {
-
     const checkExistingCycle = async () => {
       try {
         const res = await menstrualHistoryAPI();
@@ -27,13 +25,12 @@ export default function MenstrualTracker() {
         if (
           Array.isArray(data.days) &&
           data.days.length > 0 &&
-          !location.state?.forceInput // Chỉ chuyển nếu không phải bấm "nhập lại"
+          !location.state?.forceInput
         ) {
           navigate('/menstrual/ovulation', { state: { calendar: data } });
         }
       } catch (err) {
         console.error('Lỗi khi kiểm tra dữ liệu chu kỳ:', err);
-        // vẫn tiếp tục cho người dùng nhập nếu lỗi
       }
     };
 
@@ -47,31 +44,37 @@ export default function MenstrualTracker() {
       return;
     }
 
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + periodLength - 1);
+    // 👉 Tính ngày kết thúc dựa vào số ngày hành kinh
+    const endDateObj = new Date(startDate);
+    endDateObj.setDate(endDateObj.getDate() + periodLength - 1);
+    const endDate = endDateObj.toISOString().split('T')[0];
 
     try {
       setLoading(true);
 
-      // Gửi dữ liệu kỳ kinh mới
       await healthTrackerAPI({
         startDate,
-        endDate: endDate.toISOString().split('T')[0],
+        endDate,
         cycleLength,
         note: 'form',
       });
 
-      // Gửi cập nhật
-      await updateTrackerAPI({
+      const updateRes = await updateTrackerAPI({
         startDate,
-        endDate: endDate.toISOString().split('T')[0],
+        endDate,
         cycleLength,
         note: 'form',
       });
 
-      // Sau khi lưu thành công, lấy lại dữ liệu và điều hướng
-      const updatedCalendar = await menstrualHistoryAPI();
-      navigate('/menstrual/ovulation', { state: { calendar: updatedCalendar.data } });
+      const updatedCalendar = {
+        ...updateRes.data,
+        startDate,
+        endDate, // 👉 thêm thủ công vì API không trả
+      };
+
+      navigate('/menstrual/ovulation', {
+        state: { calendar: updatedCalendar },
+      });
     } catch (err) {
       console.error(err);
       setPopupMessage('Lỗi khi tính hoặc lưu chu kỳ.');

@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.*;
 
 
 import java.time.LocalDateTime;
-import java.util.Map;
+
 
 
 @RestController
@@ -51,13 +51,15 @@ public class ConsultantBookingController {
     public ResponseEntity<ApiResponse<PageResponse<ConsultantBookingDetailResponse>>> getConsultantSchedule(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "bookingDate") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction,
             @AuthenticationPrincipal Jwt jwt) {
         int consultantId = Integer.parseInt(jwt.getClaimAsString("userID"));
         String role = jwt.getClaimAsString("role");
         if (!"CONSULTANT".equalsIgnoreCase(role)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Bạn không có quyền truy cập lịch tư vấn."));
         }
-        PageResponse<ConsultantBookingDetailResponse> schedule = bookingService.getPaginatedScheduleForConsultant(consultantId, page, size);
+        PageResponse<ConsultantBookingDetailResponse> schedule = bookingService.getPaginatedScheduleForConsultant(consultantId, page, size, sortBy, direction);
         return ResponseEntity.ok(ApiResponse.success(schedule));
     }
 
@@ -70,6 +72,8 @@ public class ConsultantBookingController {
             @RequestParam(required = false) String customerName,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
+            @RequestParam(defaultValue = "bookingDate") String sortBy,
+            @RequestParam(defaultValue = "asc") String direction,
             @AuthenticationPrincipal Jwt jwt) {
         int consultantId = Integer.parseInt(jwt.getClaimAsString("userID"));
         String role = jwt.getClaimAsString("role");
@@ -81,7 +85,7 @@ public class ConsultantBookingController {
         LocalDateTime end = endDate != null && !endDate.isEmpty() ? LocalDateTime.parse(endDate) : null;
 
         PageResponse<ConsultantBookingDetailResponse> schedule = bookingService.searchConsultantSchedule(
-                consultantId, page, size, status, customerName, start, end);
+                consultantId, page, size, status, customerName, start, end, sortBy, direction);
         return ResponseEntity.ok(ApiResponse.success(schedule));
     }
 
@@ -140,21 +144,32 @@ public class ConsultantBookingController {
         return ResponseEntity.ok(new RefundResponse(msg, amount, status));
     }
 
-    /**
-     * Customer đổi lịch tư vấn đã thanh toán
-     */
     @PutMapping("/reschedule")
     @PreAuthorize("hasRole('Customer')")
-    // API for customers to reschedule a paid booking
-    public ResponseEntity<Map<String, String>> reschedule(
-            @RequestBody RescheduleRequest req,
+    // API for customers to reschedule a booking
+    public ResponseEntity<ApiResponse<String>> rescheduleBooking(
+            @RequestBody @Valid RescheduleRequest request,
             @AuthenticationPrincipal Jwt jwt) {
-
-        Integer customerId = ((Number) jwt.getClaim("userID")).intValue();
-        String result = invoiceService.rescheduleBooking(
-                req.getBookingId(), customerId, req.getNewBookingDate());
-        return ResponseEntity.ok(Map.of("message", result));
+        try {
+            Integer customerId = Integer.parseInt(jwt.getClaimAsString("userID"));
+            String result = invoiceService.rescheduleBooking(
+                    request.getBookingId(),
+                    customerId,
+                    request.getNewBookingDate()
+            );
+            return ResponseEntity.ok(ApiResponse.success(result));
+        } catch (IllegalArgumentException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error(ex.getMessage()));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error(ex.getMessage()));
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Có lỗi xảy ra khi thay đổi lịch hẹn"));
+        }
     }
+
 
     @PutMapping("/update-meeting-link/{bookingId}")
     @PreAuthorize("hasRole('Staff')")

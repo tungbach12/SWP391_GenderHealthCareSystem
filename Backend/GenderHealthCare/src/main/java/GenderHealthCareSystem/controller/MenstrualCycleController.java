@@ -66,8 +66,9 @@ public class MenstrualCycleController {
         }
     }
 
+
     @PostMapping("/update")
-    // API to update an existing menstrual cycle
+// API to update an existing menstrual cycle
     public ResponseEntity<?> updateCycle(
             @RequestBody MenstrualCycleRequest request,
             @AuthenticationPrincipal Jwt jwt) {
@@ -84,14 +85,15 @@ public class MenstrualCycleController {
         }
 
         try {
-            // Save the updated cycle and recalculate predictions
-            cycleService.updateMenstrualCycle(request, userId);
+            // 1) Update và nhận DTO mới nhất luôn từ service
+            MenstrualCycleResponse latestCycle = cycleService.updateMenstrualCycle(request, userId);
 
-            // Fetch the latest cycle to ensure the data is up-to-date
-            MenstrualCycleResponse latestCycle = cycleService.getLatestCycleForUser(userId);
+            // 2) Tính lại calendar dựa trên latestCycle
+            int menstruationDays = (int) (
+                    latestCycle.getEndDate().toEpochDay()
+                            - latestCycle.getStartDate().toEpochDay()
+            ) + 1;
 
-            // Recalculate the calendar based on the updated cycle
-            int menstruationDays = (int) (latestCycle.getEndDate().toEpochDay() - latestCycle.getStartDate().toEpochDay()) + 1;
             MenstrualCalendarResponse calendar = calendarService.buildCalendar(
                     latestCycle.getCycleId(),
                     latestCycle.getStartDate(),
@@ -106,5 +108,6 @@ public class MenstrualCycleController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Lỗi hệ thống");
         }
     }
+
 }
 

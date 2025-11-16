@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.Optional;
 
 import static GenderHealthCareSystem.util.PageResponseUtil.mapToPageResponse;
@@ -178,6 +179,40 @@ public class StisBookingController {
     public ResponseEntity<ApiResponse<Void>> markBookingAsResultedAt(@PathVariable Integer id) {
         stisBookingService.resultedTime(id);
         return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK, "cập nhật thời gian có kết quả thành công", null, null));
+    }
+
+    @PutMapping("/{id}/reschedule")
+    public ResponseEntity<ApiResponse<StisBookingResponse>> rescheduleBooking(
+            @PathVariable Integer id,
+            @RequestParam LocalDate newDate,
+            @RequestParam LocalTime newTime,
+            @AuthenticationPrincipal Jwt jwt) {
+        try {
+            // Verify the user owns this booking or is admin/staff
+            StisBooking booking = stisBookingService.getBookingByID(id);
+            Integer userId = Integer.parseInt(jwt.getClaimAsString("userID"));
+            String role = jwt.getClaimAsString("role");
+
+            // Allow only if user owns the booking or is admin/staff
+            if (!booking.getCustomer().getUserId().equals(userId) &&
+                    !"ADMIN".equals(role) && !"STAFF".equals(role)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(new ApiResponse<>(HttpStatus.FORBIDDEN, "You are not authorized to reschedule this booking", null, "FORBIDDEN"));
+            }
+
+            // Perform rescheduling
+            StisBookingResponse rescheduledBooking = stisBookingService.rescheduleBooking(id, newDate, newTime);
+
+            // Send email notification if needed
+            String email = booking.getCustomer().getAccount().getEmail();
+            emailService.sendBookingConfirmationEmail(email, booking.getStisService().getServiceName(),
+                    "Lịch hẹn của bạn đã được dời đến " + newDate + " " + newTime);
+
+            return ResponseEntity.ok(new ApiResponse<>(HttpStatus.OK, "Booking rescheduled successfully", rescheduledBooking, null));
+        } catch (RuntimeException ex) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ApiResponse<>(HttpStatus.BAD_REQUEST, ex.getMessage(), null, "BAD_REQUEST"));
+        }
     }
 
 }

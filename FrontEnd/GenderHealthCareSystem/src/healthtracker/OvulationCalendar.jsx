@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { menstrualHistoryAPI } from "../components/api/HeathTracker.api";
+import { menstrualHistoryAPI, updateTrackerAPI } from "../components/api/HeathTracker.api";
 import dayjs from "dayjs";
 
 export default function OvulationCalendar() {
@@ -10,6 +10,9 @@ export default function OvulationCalendar() {
   const [selectedMonth, setSelectedMonth] = useState(null);
   const [selectedYear, setSelectedYear] = useState(null);
   const [availableMonths, setAvailableMonths] = useState([]);
+  const [selectedStartDate, setSelectedStartDate] = useState(null);
+  const [selectedEndDate, setSelectedEndDate] = useState(null);
+  const [showUpdateBox, setShowUpdateBox] = useState(false);
 
   useEffect(() => {
     const fetchCalendar = async () => {
@@ -47,9 +50,7 @@ export default function OvulationCalendar() {
         .sort((a, b) => b - a)[0];
 
       const baseDate = lastReal || new Date();
-      const key = `${baseDate.getFullYear()}-${String(
-        baseDate.getMonth() + 1
-      ).padStart(2, "0")}`;
+      const key = `${baseDate.getFullYear()}-${String(baseDate.getMonth() + 1).padStart(2, "0")}`;
       const [y, m] = key.split("-").map(Number);
       setSelectedYear(y);
       setSelectedMonth(m - 1);
@@ -65,7 +66,7 @@ export default function OvulationCalendar() {
       const date = new Date(year, month, i);
       days.push({
         date,
-        dateStr: dayjs(date).format("YYYY-MM-DD"), // dùng dayjs tránh lệch
+        dateStr: dayjs(date).format("YYYY-MM-DD"),
         weekday: date.getDay(),
       });
     }
@@ -99,6 +100,54 @@ export default function OvulationCalendar() {
     }
   };
 
+  const handleDateClick = (dateStr) => {
+    if (!selectedStartDate) {
+      setSelectedStartDate(dateStr);
+    } else if (!selectedEndDate) {
+      if (dayjs(dateStr).isAfter(dayjs(selectedStartDate))) {
+        setSelectedEndDate(dateStr);
+        setShowUpdateBox(true);
+      } else {
+        setSelectedStartDate(dateStr);
+        setSelectedEndDate(null);
+        setShowUpdateBox(false);
+      }
+    } else {
+      setSelectedStartDate(dateStr);
+      setSelectedEndDate(null);
+      setShowUpdateBox(false);
+    }
+  };
+
+  const handleUpdateCycle = async () => {
+    if (!selectedStartDate || !selectedEndDate) return;
+
+    const periodLength = dayjs(selectedEndDate).diff(dayjs(selectedStartDate), "day") + 1;
+    if (periodLength < 2 || periodLength > 12) {
+      alert("Độ dài kỳ kinh phải từ 2 đến 12 ngày.");
+      return;
+    }
+
+    try {
+      const res = await updateTrackerAPI({
+        startDate: selectedStartDate,
+        endDate: selectedEndDate,
+        cycleLength: calendar.cycleLength,
+        note: "form",
+      });
+
+      const updated = {
+        ...res.data,
+        startDate: selectedStartDate,
+        endDate: selectedEndDate,
+      };
+
+      navigate("/menstrual/ovulation", { state: { calendar: updated } });
+    } catch (err) {
+      alert("Lỗi khi cập nhật chu kỳ. Vui lòng thử lại sau.");
+    }
+  };
+
   const handlePrev = () => {
     const key = `${selectedYear}-${String(selectedMonth + 1).padStart(2, "0")}`;
     const idx = availableMonths.indexOf(key);
@@ -122,10 +171,17 @@ export default function OvulationCalendar() {
   if (!calendar || selectedYear === null || selectedMonth === null) return null;
   const calendarGrid = buildCalendarGrid(selectedYear, selectedMonth);
 
+  const startDate =
+    calendar.startDate || location.state?.calendar?.startDate || localStorage.getItem("menstrualStartDate");
+  const endDate =
+    calendar.endDate || location.state?.calendar?.endDate || localStorage.getItem("menstrualEndDate");
   const cycleLength = calendar.cycleLength || localStorage.getItem("menstrualCycleLength");
-  const startDate = calendar.startDate || localStorage.getItem("menstrualStartDate");
-  const menstruationDays = calendar.days.filter((d) => d.type === "MENSTRUATION");
-  const periodLength = menstruationDays.length || "-";
+
+  const periodLength = (() => {
+    if (!startDate || !endDate) return "-";
+    const diff = dayjs(endDate).diff(dayjs(startDate), "day") + 1;
+    return diff >= 2 && diff <= 12 ? diff : "-";
+  })();
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 text-center">
@@ -180,9 +236,14 @@ export default function OvulationCalendar() {
             day ? (
               <div
                 key={j}
-                className={`w-16 h-16 flex flex-col items-center justify-center rounded-full shadow text-xs ${getColor(
+                onClick={() => handleDateClick(day.dateStr)}
+                className={`cursor-pointer w-16 h-16 flex flex-col items-center justify-center rounded-full shadow text-xs ${getColor(
                   day.dateStr
-                )}`}
+                )} ${
+                  selectedStartDate === day.dateStr || selectedEndDate === day.dateStr
+                    ? "ring-2 ring-blue-500"
+                    : ""
+                }`}
               >
                 <div className="font-bold text-base">{day.date.getDate()}</div>
                 <div className="text-[10px] mt-1">
@@ -223,6 +284,22 @@ export default function OvulationCalendar() {
           Ngày thường
         </p>
       </div>
+
+      {showUpdateBox && (
+        <div className="mt-6 text-center bg-blue-50 border border-blue-300 p-4 rounded-lg">
+          <p>
+            Cập nhật kỳ kinh từ{" "}
+            <strong>{dayjs(selectedStartDate).format("DD/MM/YYYY")}</strong> đến{" "}
+            <strong>{dayjs(selectedEndDate).format("DD/MM/YYYY")}</strong>?
+          </p>
+          <button
+            onClick={handleUpdateCycle}
+            className="mt-3 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Xác nhận cập nhật
+          </button>
+        </div>
+      )}
 
       <div className="mt-8 flex justify-center gap-4">
         <button
